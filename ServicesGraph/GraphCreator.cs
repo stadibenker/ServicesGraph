@@ -22,9 +22,7 @@ namespace ServicesGraph
         //словарь с количеством транзакций для данного направления для временных интервалов intervalNumber
         public Dictionary<int, int> transfers = new Dictionary<int, int>();       
     }
-
-
-
+    
 
     class GraphCreator
     {
