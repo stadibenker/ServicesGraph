@@ -42,6 +42,7 @@ namespace ServicesGraph
             graphCreator.CreateGraph(fileName, startInterval, endInterval, out nodes, out edges);
             
             GraphDisplay graphDisplay = new GraphDisplay(nodes, edges, startInterval, graphCreator.interval);     //класс для вывода графа
+
             //вызов функции вывода графа
             graphDisplay.Display();
             Console.ReadKey();
