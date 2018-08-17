@@ -1,67 +1,92 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace ServicesGraph
 {
     class GraphDisplay
     {
-        public void Display(Dictionary<string, Service> services, DateTime startPoint, int interval)
+        private Dictionary<string, Service> services;
+        private List<Transaction> transactions;
+        private DateTime startPoint;
+        private int interval;
+
+        public GraphDisplay(Dictionary<string, Service> services, List<Transaction> transactions, DateTime startPoint, int interval)
         {
-            int intervalNumber = 0;
+            this.services = services;
+            this.transactions = transactions;
+            this.startPoint = startPoint;
+            this.interval = interval;
+        }
+        
+        public void Display()
+        {
+            
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("Graph structure:");
             Console.ResetColor();
             //вывод структуры графа
-            DisplayGraphStructure(services);
-            DisplayTransferActivity(services, startPoint, interval);
+            DisplayGraphStructure();
+            //вывод статистики по вершинам и рёбрам
+            DisplayTransferActivity();
         }
 
-
-        private void DisplayGraphStructure(Dictionary<string, Service> services)
+        
+        private void DisplayGraphStructure()
         //функция для вывода статистики всех сервисов коллекции services и их транзакций
         {
             foreach (KeyValuePair<string, Service> service in services)
             {
                 Console.WriteLine($"\nService \"{service.Key}\" has link with:");
                 //перебираем все рёбра, связанные с текущей вершиной перебираемой коллекции
-                foreach (KeyValuePair<string, Transaction> transaction in service.Value.transactions)
+                foreach(Transaction transact in transactions)
                 {
-                    Console.WriteLine($"\t- { transaction.Key}");
+                    if(transact.sourseService == service.Key)
+                    {
+                        Console.WriteLine($"\t- {transact.recipientServive}");
+                    }
+                    if (transact.recipientServive == service.Key)
+                    {
+                        Console.WriteLine($"\t- {transact.sourseService}");
+                    }
                 }
             }
         }
 
 
-        private void DisplayTransferActivity(Dictionary<string, Service> services, DateTime startPoint, int interval)
+        private void DisplayTransferActivity()
         //функция для вывода статистики передач между сервисами
         {
-            int intervalNumber = 1;
-            int count = 0;
-            string sourseService, recipientServive;
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\nServices activity:");
-            Console.ResetColor();
-            //вывод статистики
+            Console.WriteLine();
             foreach (KeyValuePair<string, Service> service in services)
             {
-                sourseService = service.Key;
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"{sourseService} activity:");
+                Console.WriteLine($"{service.Key} activity:");
                 Console.ResetColor();
-
-                foreach (KeyValuePair<string, Transaction> transaction in service.Value.transactions)
+                foreach (int intervalNumber in service.Value.activity.Keys)
                 {
-                    Service linkService = transaction.Value.relatedService;
-                    recipientServive = transaction.Key;
+                    Console.WriteLine($"From {startPoint.AddSeconds(interval * (intervalNumber - 1))} " +
+                        $"to {startPoint.AddSeconds(interval * intervalNumber)}" +
+                        $"\tInteractions quantity = {service.Value.activity[intervalNumber]}");
+                    Console.WriteLine("Transactions quantity:");
+                    foreach (Transaction transact in transactions)
+                    {
+                        if (transact.transfers.ContainsKey(intervalNumber) == true)
+                        {
+                            if (transact.sourseService == service.Key)
+                            {
 
-                    if(transaction.Value.transfers.ContainsKey(intervalNumber) == true)
-                    {
-                        count += linkService.transactions[sourseService].transfers[intervalNumber];
-                    }
-                    foreach (KeyValuePair<int, int> act in transaction.Value.transfers)
-                    {
-                        Console.WriteLine(act.Value + linkService.transactions[sourseService].transfers[intervalNumber]);
+                                Console.WriteLine($"{service.Key} " +
+                                    $"---- {transact.recipientServive} " +
+                                    $"= {transact.transfers[intervalNumber]}");
+
+                            }
+                            if (transact.recipientServive == service.Key)
+                            {
+                                Console.WriteLine($"{service.Key} ---- " +
+                                    $"{transact.sourseService} = " +
+                                    $"{transact.transfers[intervalNumber]}");
+                            }
+                        }
                     }
                 }
             }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace ServicesGraph
 {
@@ -10,46 +9,56 @@ namespace ServicesGraph
     {
         //словарь, содержащий № временных интервалов и количество взаимосвязей для каждого из них
         public Dictionary<int, int> activity = new Dictionary<int, int>();  
-        //словарь, содержащий имена сервисов, с которыми есть связь и ссылки на них
-        public Dictionary<string, Transaction> transactions = new Dictionary<string, Transaction>();    
     }
 
-    //класс, описывающий связи между сервисами (рёбра графа)
-    class Transaction
+    //структура, описывающая связи между сервисами (рёбра графа)
+    struct Transaction
     {
-        //cсылка на связанный сервис
-        public Service relatedService = new Service();                 
-        //словарь с количеством транзакций для данного направления для временных интервалов intervalNumber
-        public Dictionary<int, int> transfers = new Dictionary<int, int>();       
+        public string sourseService;            //имя сервиса-отправителя (from)
+        public string recipientServive;         //имя сервиса-получателя  (to)
+        public Dictionary<int, int> transfers;  //карта активности: ключ - № временного интервала, значение - количество транзакций для этого интервала
     }
-    
 
     class GraphCreator
     {
-        public readonly int interval = 10;    //единица времени в секундах, на равные доли которой разбивается введённый промежуток времени.
-                                              //если = 0 или > общего промежутка времени, указанного при старте программы,
+        public int interval = 10;             //единица времени в секундах, на равные доли которой разбивается введённый промежуток времени.
+                                              //если > общего промежутка времени, указанного при старте программы,
                                               //то расчёт кол-ва взаимодействий и передач между сервисами происходит для всего интервала без разбития на единицы времени.
 
-        public DateTime startingPoint;        //начальное время, которое будет вычитаться из времени прихода запроса для определения № временного интервала
+        private DateTime startingPoint { get; set; }        //начальное время, которое будет вычитаться из времени прихода запроса для определения № временного интервала
 
-        private int intervalNumber;           //номер временного интервала (увеличивается, зависит от переменной interval и времени поступления запроса)
+        private int intervalNumber { get; set; }            //номер временного интервала (увеличивается, зависит от переменной interval и времени поступления запроса)
 
-        private Dictionary<string, Service> services = new Dictionary<string, Service>();     //словарь сервисов с транзакциями
-        
-        public Dictionary<string, Service> CreateGraph(string fileName, DateTime startInterval, DateTime endInterval)
+        private Dictionary<string, Service> services = new Dictionary<string, Service>();     //словарь сервисов
+        private List<Transaction> transactions = new List<Transaction>();                     //список связей
+
+
+        public void CreateGraph(string fileName, DateTime startInterval, DateTime endInterval, 
+                                out Dictionary<string, Service> outServices, out List<Transaction> outTransactions)
+        //функция для создания графа. на вход принимает имя файла, начальный и конечный интервал, для которого строить граф
+        //возвращает словарь с сервисами (вершины) и список связей между ними (рёбра) 
         {
-            string text;
+            string text;        //хранит строку, считанную с файла
             StreamReader read = new StreamReader(fileName);
-            DateTime currentDate;
+            DateTime currentDate;                  //текущая дата, используется для определения временного интервала относительно начального времени startInterval
             startingPoint = startInterval;         //записываем стартовый интервал
-            
+            TimeSpan timeSpan;
+            timeSpan = endInterval.Subtract(startInterval);   //определение величины интервала
+            if (interval > (int)timeSpan.TotalSeconds) interval = (int)timeSpan.TotalSeconds;   //обрезаем interval, если он > величины интервала
+
             while ((text = read.ReadLine()) != null)
             {
-                string[] part = text.Split(" ");
+                //вытаскиваем со строки дату и имена отправителя и получателя
+                string s1 = " ";
+                char []s2 = s1.ToCharArray();
+                string[] part = text.Split(s2);
                 string dateTime = part[0];
                 string sourseService = part[1];
                 string recipientService = part[2];
+                if (sourseService == recipientService) continue;    //пропускаем петли (отправка сообщения самому себе)
                 currentDate = DateTime.Parse(dateTime);
+                if (currentDate < startInterval) continue;          //пропускаем времена, которые раньше указанного интервала
+                if (currentDate > endInterval) break;               //если время выходит за интервал - завершаем чтение
 
                 //вычисляем № временного интервала
                 intervalNumber = GetIntervalNumber(currentDate);
@@ -59,7 +68,7 @@ namespace ServicesGraph
                 {
                     CreateService(sourseService);
                 }
-                if(services.ContainsKey(recipientService) == false)
+                if (services.ContainsKey(recipientService) == false)
                 {
                     CreateService(recipientService);
                 }
@@ -70,11 +79,11 @@ namespace ServicesGraph
 
                 //связываем сервисы между собой и увеличиваем счётчик передач данных по ребру
                 SetTransaction(sourseService, recipientService);
-                //устанавливаем обратную свять, счётчик не трогаем
-                SetReverseTransaction(sourseService, recipientService);
             }
+            read.Close();
 
-            return services;
+            outServices = services;
+            outTransactions = transactions;
         }
 
 
@@ -84,7 +93,7 @@ namespace ServicesGraph
             TimeSpan timeSpan;
             timeSpan = currentDate.Subtract(startingPoint);   //определение интервала
             int intervalNum = (int)timeSpan.TotalMilliseconds / (interval * 1000) + 1;     //расчёт номера интервала
-            if (intervalNum < 0) intervalNum = 1;
+            //if (intervalNum < 0) intervalNum = 1;
             return intervalNum;
         }
 
@@ -116,40 +125,38 @@ namespace ServicesGraph
         private void SetTransaction(string sourseService, string recipientServive)
         //функция для установки связи и увеличения счётчика взаимодействий между двумя сервисами, указанных в sourseService и recipientServive
         {
-            //если сервисы ещё не связаны между собой, то создаём связь и устанавливаем число взаимодействий между сервисами = 1
-            if (services[sourseService].transactions.ContainsKey(recipientServive) == false)
+            bool isFind = false;    //флаг, указывающий, найдена ли транзакция в списке
+            foreach (Transaction transact in transactions)
+            {
+                //если связь sourseService - recipientServive есть (в любом направлении), то увеличиваем количество передач для этой связи на 1
+                if (((transact.sourseService == sourseService || transact.sourseService == recipientServive)
+                    && (transact.recipientServive == sourseService || transact.recipientServive == recipientServive)) == true)
+                {
+                    //если уже есть счётчик связей для текущего интервала времени - увеличиваем его на 1
+                    if (transact.transfers.ContainsKey(intervalNumber) == true)
+                    {
+                        transact.transfers[intervalNumber]++;
+                    }
+                    //если отсутсвует счётчик связей для текущего интервала времени - создаём и устанавливаем 1
+                    else
+                    {
+                        transact.transfers.Add(intervalNumber, 1);
+                    }
+                    //устанавливаем, что нашли связь
+                    isFind = true;
+                    break;
+                }
+            }
+
+            //если связи нет - создаём
+            if (isFind == false)
             {
                 Transaction newTransaction = new Transaction();
-                newTransaction.relatedService = services[recipientServive];
+                newTransaction.sourseService = sourseService;
+                newTransaction.recipientServive = recipientServive;
+                newTransaction.transfers = new Dictionary<int, int>();
                 newTransaction.transfers.Add(intervalNumber, 1);
-                services[sourseService].transactions.Add(recipientServive, newTransaction);
-            }
-            //если связь есть, то
-            else
-            {
-                //проверяем, есть ли для текущего временного интвервала счётчик взаимодействий. если нет,
-                //то создаём и устанавливаем 1, если есть, то увеличиваем на 1.
-                if (services[sourseService].transactions[recipientServive].transfers.ContainsKey(intervalNumber) == false)
-                {
-                    services[sourseService].transactions[recipientServive].transfers.Add(intervalNumber, 1);
-                }
-                else
-                {
-                    services[sourseService].transactions[recipientServive].transfers[intervalNumber]++;
-                }
-            }
-        }
-
-
-        private void SetReverseTransaction(string sourseService, string recipientServive)
-        //функция для установки обратной связи между источником и получаетелем
-        {
-            //создаём для сервиса recipientServive обратную связь на sourseService, если такова отсутсвует
-            if (services[recipientServive].transactions.ContainsKey(sourseService) == false)
-            {
-                Transaction newTransaction = new Transaction();
-                newTransaction.relatedService = services[sourseService];
-                services[recipientServive].transactions.Add(sourseService, newTransaction);
+                transactions.Add(newTransaction);       //добавляем связь в список
             }
         }
     }
