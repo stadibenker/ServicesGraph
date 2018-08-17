@@ -8,8 +8,8 @@ namespace ServicesGraph
         static void Main(string[] args)
         //ввод данных по аргументам коммандной строки или в ходе выполнения программы.
         //1й аргумент - имя файла с исходными данными
-        //2й аргумент - начало интервала в формате YYYY-MM-DD HH:MI:SS.milliseconds
-        //3й аргумент - конец интервала в формате YYYY-MM-DD HH:MI:SS.milliseconds
+        //2й аргумент - начало интервала в формате YYYY-MM-DDTHH:MI:SS.milliseconds
+        //3й аргумент - конец интервала в формате YYYY-MM-DDTHH:MI:SS.milliseconds
         {
             GraphCreator graphCreator = new GraphCreator();     //класс для создания графа
             Dictionary<string, Service> nodes;        //словарь вершин, для хранения результата функции CreateGraph
